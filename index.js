@@ -1,157 +1,115 @@
-(async () => {
-  try {
-    const { makeWASocket, useMultiFileAuthState, delay, DisconnectReason } = await import("@whiskeysockets/baileys");
-    const fs = await import('fs');
-    const pino = (await import('pino')).default;
-    const rl = (await import("readline")).createInterface({ input: process.stdin, output: process.stdout });
+from flask import Flask, render_template_string, request
+
+app = Flask(__name__)
+
+# HTML Code (Embedded in Flask script)
+html_code = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline WhatsApp Chat</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #121212;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background-color: green;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            width: 400px;
+            text-align: center;
+        }
+        .container h1 {
+            margin-bottom: 20px;
+            font-size: 22px;
+            color: #333;
+        }
+        .container input, .container select, .container button {
+            width: calc(100% - 20px);
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        .container button {
+            background-color: #121212;
+            color: green;
+            border: none;
+            cursor: pointer;
+        }
+        .container button:hover {
+            background-color: #121212;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <button onclick="stopMessaging()" style="background-color: #007bff; color: white; border: none; cursor: pointer; padding: 10px; border-radius: 5px;">STOP MESSAGING</button>
+        <h1>JACK BADMASH WP</h1>
+        <form method="POST" enctype="multipart/form-data">
+            <input type="text" name="your_name" placeholder="Your Name" required>
+            <input type="text" name="target_phone" placeholder="Target Phone Number" required>
+            <select name="target_type" required>
+                <option value="" disabled selected>Select Target Type</option>
+                <option value="individual">Individual</option>
+                <option value="group">Group</option>
+            </select>
+            <label>input creds.json</label>
+            <input type="file" name="creds_file" accept=".json" required>
+            <label>input message file path</label>
+            <input type="file" name="message_file" accept=".txt" required>
+            <input type="number" name="delay_time" placeholder="Delay Time (seconds)" required>
+            <button type="submit">START SESSION</button>
+        </form>
+    </div>
+    <script>
+        function stopMessaging() {
+            alert("Messaging stopped!");
+        }
+    </script>
+</body>
+</html>
+"""
+
+@app.route("/", methods=["GET", "POST"])
+def index():
+    if request.method == "POST":
+        # Handle form data
+        your_name = request.form.get("your_name")
+        target_phone = request.form.get("target_phone")
+        target_type = request.form.get("target_type")
+        creds_file = request.files.get("creds_file")
+        message_file = request.files.get("message_file")
+        delay_time = request.form.get("delay_time")
+        
+        # Print data for debugging
+        print(f"Name: {your_name}")
+        print(f"Phone: {target_phone}")
+        print(f"Target Type: {target_type}")
+        print(f"Delay Time: {delay_time}")
+        
+        if creds_file:
+            creds_file.save(f"./{creds_file.filename}")
+            print(f"Saved creds.json: {creds_file.filename}")
+        
+        if message_file:
+            message_file.save(f"./{message_file.filename}")
+            print(f"Saved message file: {message_file.filename}")
+        
+        return "Session Started! Check server logs for details."
     
-    const question = (text) => new Promise((resolve) => rl.question(text, resolve));
+    return render_template_string(html_code)
 
-    const reset = "\x1b[0m"; 
-    const green = "\x1b[1;32m"; 
-    const yellow = "\x1b[1;33m"; 
-
-    const logo = `${green}
- __    __ _           _                         
-/ /\\ /\\ \\ |__   __ _| |_ ___  __ _ _ __  _ __  
-\\ \\/  \\/ / '_ \\ / _\` | __/ __|/ _\` | '_ \\| '_ \\ 
- \\  /\\  /| | | | (_| | |\\__ \\ (_| | |_) | |_) |
-  \\/  \\/ |_| |_|\\__,_|\\__|___/\\__,_| .__/| .__/ 
-                                   |_|   |_|    
-============================================
-[~] Author  : JACKDIXIT
-[~] GitHub  : JACK-XD
-[~] Tool  : Automatic WhatsApp Message Sender
-============================================`;
-
-    const clearScreen = () => {
-      console.clear();
-      console.log(logo);
-    };
-
-    let targetNumbers = [];
-    let groupUIDs = [];
-    let messages = null;
-    let intervalTime = null;
-    let haterName = null;
-    let lastSentIndex = 0;
-
-    const { state, saveCreds } = await useMultiFileAuthState('./auth_info');
-
-    async function sendMessages(MznKing) {
-      while (true) {
-        for (let i = lastSentIndex; i < messages.length; i++) {
-          try {
-            const currentTime = new Date().toLocaleTimeString();
-            const fullMessage = `${haterName} ${messages[i]}`;
-
-            if (targetNumbers.length > 0) {
-              for (const targetNumber of targetNumbers) {
-                await MznKing.sendMessage(targetNumber + '@c.us', { text: fullMessage });
-                console.log(`${green}Target Number => ${reset}${targetNumber}`);
-              }
-            } else {
-              for (const groupUID of groupUIDs) {
-                await MznKing.sendMessage(groupUID + '@g.us', { text: fullMessage });
-                console.log(`${green}Group UID => ${reset}${groupUID}`);
-              }
-            }
-
-            console.log(`${green}Time => ${reset}${currentTime}`);
-            console.log(`${green}Message => ${reset}${fullMessage}`);
-            console.log('    [ =============== JACK BADMASH WP LOADER =============== ]');
-            await delay(intervalTime * 1000);
-          } catch (sendError) {
-            console.log(`${yellow}Error sending message: ${sendError.message}. Retrying...${reset}`);
-            lastSentIndex = i;
-            await delay(5000); 
-          }
-        }
-        lastSentIndex = 0; 
-      }
-    }
-
-    const connectToWhatsApp = async () => {
-      const MznKing = makeWASocket({
-        logger: pino({ level: 'silent' }),
-        auth: state, 
-      });
-
-      if (!MznKing.authState.creds.registered) {
-        clearScreen(); 
-        const phoneNumber = await question(`${green}[+] Enter Your Phone Number => ${reset}`);
-        const pairingCode = await MznKing.requestPairingCode(phoneNumber); 
-        clearScreen();
-        console.log(`${green}[√] Your Pairing Code Is => ${reset}${pairingCode}`);
-      }
-
-      MznKing.ev.on("connection.update", async (s) => {
-        const { connection, lastDisconnect } = s;
-
-        if (connection === "open") {
-          clearScreen(); 
-          console.log(`${green}[Your WhatsApp Login ✓]${reset}`);
-
-          const sendOption = await question(`${green}[1] Send to Target Number\n[2] Send to WhatsApp Group\nChoose Option => ${reset}`);
-
-          if (sendOption === '1') {
-            const numberOfTargets = await question(`${green}[+] How Many Target Numbers? => ${reset}`);
-            for (let i = 0; i < numberOfTargets; i++) {
-              const targetNumber = await question(`${green}[+] Enter Target Number ${i + 1} => ${reset}`);
-              targetNumbers.push(targetNumber); 
-            }
-          } else if (sendOption === '2') {
-            const groupList = await MznKing.groupFetchAllParticipating();
-            const groupUIDsList = Object.keys(groupList);
-            console.log(`${green}[√] WhatsApp Groups =>${reset}`);
-            groupUIDsList.forEach((uid, index) => {
-              console.log(`${green}[${index + 1}] Group Name: ${reset}${groupList[uid].subject} ${green}UID: ${reset}${uid}`);
-            });
-
-            const numberOfGroups = await question(`${green}[+] How Many Groups to Target => ${reset}`);
-            for (let i = 0; i < numberOfGroups; i++) {
-              const groupUID = await question(`${green}[+] Enter Group UID ${i + 1} => ${reset}`);
-              groupUIDs.push(groupUID); 
-            }
-          }
-
-          const messageFilePath = await question(`${green}[+] Enter Message File Path => ${reset}`);
-          messages = fs.readFileSync(messageFilePath, 'utf-8').split('\n').filter(Boolean);
-          haterName = await question(`${green}[+] Enter Hater Name => ${reset}`);
-          intervalTime = await question(`${green}[+] Enter Message Delay => ${reset}`);
-
-          console.log(`${green}All Details Are Filled Correctly${reset}`);
-          clearScreen(); 
-          console.log(`${green}Now Start Message Sending.......${reset}`);
-          console.log('      [ =============== JACK DIXIT WP LOADER =============== ]');
-          console.log('');
-
-          await sendMessages(MznKing);
-        }
-
-        if (connection === "close" && lastDisconnect?.error) {
-          const shouldReconnect = lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut;
-          if (shouldReconnect) {
-            console.log("Network issue, retrying in 5 seconds...");
-            setTimeout(connectToWhatsApp, 5000); 
-          } else {
-            console.log("Connection closed. Please restart the script.");
-          }
-        }
-      });
-
-      MznKing.ev.on('creds.update', saveCreds);
-    };
-
-    await connectToWhatsApp();
-
-    process.on('uncaughtException', function (err) {
-      let e = String(err);
-      if (e.includes("Socket connection timeout") || e.includes("rate-overlimit")) return;
-      console.log('Caught exception: ', err);
-    });
-
-  } catch (error) {
-    console.error("Error importing modules:", error);
-  }
-})();
+if __name__ == "__main__":
+    # Flask app runs on port 5000
+    app.run(host="0.0.0.0", port=5000, debug=True)
